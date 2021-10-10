@@ -36,16 +36,15 @@ class DeepESN():
     
     def __init__(self, Nu,Nr,Nl, configs, verbose=0):
         # initialize the DeepESN model
-        
         if verbose:
             sys.stdout.write('init DeepESN...')
             sys.stdout.flush()
         
-        rhos = np.array(configs.rhos) # spectral radius (maximum absolute eigenvalue)
-        lis = np.array(configs.lis) # leaky rate
-        iss = np.array(configs.iss) # input scale
-        IPconf = configs.IPconf # configuration for Deep Intrinsic Plasticity
-        reservoirConf = configs.reservoirConf # reservoir configurations
+        rhos = np.array(configs["rhos"]) # spectral radius (maximum absolute eigenvalue)
+        lis = np.array(configs["lis"]) # leaky rate
+        iss = np.array(configs["iss"]) # input scale
+        IPconf = configs["IPconf"] # configuration for Deep Intrinsic Plasticity
+        reservoirConf = configs["reservoirConf"] # reservoir configurations
         
         if len(rhos.shape) == 0:
             rhos = npm.repmat(rhos, 1,Nl)[0]
@@ -70,14 +69,14 @@ class DeepESN():
 
         self.IPconf = IPconf   
         
-        self.readout = configs.readout
+        self.readout = configs["readout"]
                
         # sparse recurrent weights init
-        if reservoirConf.connectivity < 1:
+        if reservoirConf["connectivity"] < 1:
             for layer in range(Nl):
                 self.W[layer] = np.zeros((Nr,Nr))
                 for row in range(Nr):
-                    number_row_elements = round(reservoirConf.connectivity * Nr)
+                    number_row_elements = round(reservoirConf["connectivity"] * Nr)
                     row_elements = random.sample(range(Nr), number_row_elements)
                     self.W[layer][row,row_elements] = np.random.uniform(-1,+1, size = (1,number_row_elements))
                     
@@ -135,9 +134,9 @@ class DeepESN():
                 state_net[:,t:t+1] = self.W[layer].dot(state[:,t-1:t]) + input[:,t:t+1]
                 state[:,t:t+1] = (1-self.lis[layer]) * state[:,t-1:t] + self.lis[layer] * np.tanh(np.multiply(self.Gain[layer], state_net[:,t:t+1]) + self.Bias[layer])
                 
-                eta = self.IPconf.eta
-                mu = self.IPconf.mu
-                sigma2 = self.IPconf.sigma**2
+                eta = self.IPconf["eta"]
+                mu = self.IPconf["mu"]
+                sigma2 = self.IPconf["sigma"]**2
             
                 # IP learning rule
                 deltaBias = -eta*((-mu/sigma2)+ np.multiply(state[:,t:t+1], (2*sigma2+1-(state[:,t:t+1]**2)+mu*state[:,t:t+1])/sigma2))
@@ -163,25 +162,25 @@ class DeepESN():
         
         for layer in range(self.Nl):
 
-            for epoch in range(self.IPconf.Nepochs):
+            for epoch in range(self.IPconf["Nepochs"]):
                 Gain_epoch = self.Gain[layer]
                 Bias_epoch = self.Bias[layer]
 
 
                 if len(inputs) == 1:
-                    self.computeLayerState(inputs[0][:,self.IPconf.indexes], layer, DeepIP = 1)
+                    self.computeLayerState(inputs[0][:,self.IPconf["indexes"]], layer, DeepIP = 1)
                 else:
-                    for i in self.IPconf.indexes:
+                    for i in self.IPconf["indexes"]:
                         self.computeLayerState(inputs[i], layer, DeepIP = 1)
                        
                 
-                if (np.linalg.norm(self.Gain[layer]-Gain_epoch,2) < self.IPconf.threshold) and (np.linalg.norm(self.Bias[layer]-Bias_epoch,2)< self.IPconf.threshold):
+                if (np.linalg.norm(self.Gain[layer]-Gain_epoch,2) < self.IPconf["threshold"]) and (np.linalg.norm(self.Bias[layer]-Bias_epoch,2)< self.IPconf["threshold"]):
                     sys.stdout.write(str(epoch+1))
                     sys.stdout.write('.')
                     sys.stdout.flush()
                     break
                 
-                if epoch+1 == self.IPconf.Nepochs:
+                if epoch+1 == self.IPconf["Nepochs"]:
                     sys.stdout.write(str(epoch+1))
                     sys.stdout.write('.')
                     sys.stdout.flush()
@@ -200,7 +199,7 @@ class DeepESN():
     def computeState(self,inputs, DeepIP = 0, initialStates = None, verbose=0):
         # compute the global state of DeepESN with pre-training if DeepIP == 1         
         
-        if self.IPconf.DeepIP and DeepIP:
+        if self.IPconf["DeepIP"] and DeepIP:
             if verbose:
                 sys.stdout.write('compute state with DeepIP...')
                 sys.stdout.flush()
@@ -251,7 +250,7 @@ class DeepESN():
             sys.stdout.write('train readout...')
             sys.stdout.flush()
         
-        if self.readout.trainMethod == 'SVD': # SVD, accurate method
+        if self.readout["trainMethod"] == 'SVD': # SVD, accurate method
             U, s, V = np.linalg.svd(trainStates, full_matrices=False);  
             s = s/(s**2 + lb)
                       

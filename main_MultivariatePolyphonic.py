@@ -57,7 +57,7 @@ def main():
     transient = 5
     
     deepESN = DeepESN(Nu, Nr, Nl, configs)
-    states = deepESN.computeState(dataset.inputs, deepESN.IPconf.DeepIP)
+    states = deepESN.computeState(dataset.inputs, deepESN.IPconf["DeepIP"])
     
     train_states = select_indexes(states, list(TR_indexes) + list(VL_indexes), transient)
     train_targets = select_indexes(dataset.targets, list(TR_indexes) + list(VL_indexes), transient)
