@@ -34,7 +34,7 @@ class DeepESN():
     ----
     '''
     
-    def __init__(self, Nu,Nr,Nl, configs, verbose=0):
+    def __init__(self, configs, verbose=0):
         # initialize the DeepESN model
         if verbose:
             sys.stdout.write('init DeepESN...')
@@ -45,24 +45,25 @@ class DeepESN():
         iss = np.array(configs["iss"]) # input scale
         IPconf = configs["IPconf"] # configuration for Deep Intrinsic Plasticity
         reservoirConf = configs["reservoirConf"] # reservoir configurations
+
+        self.Nu = configs["Nu"] # number of inputs
+        self.Nr = configs["Nr"] # number of units per layer
+        self.Nl = configs["Nl"] # number of layers
         
         if len(rhos.shape) == 0:
-            rhos = npm.repmat(rhos, 1,Nl)[0]
+            rhos = npm.repmat(rhos, 1,self.Nl)[0]
 
         if len(lis.shape) == 0:
-            lis = npm.repmat(lis, 1,Nl)[0]
+            lis = npm.repmat(lis, 1,self.Nl)[0]
 
         if len(iss.shape) == 0:
-            iss = npm.repmat(iss, 1,Nl)[0]
+            iss = npm.repmat(iss, 1,self.Nl)[0]
             
         self.W = {} # recurrent weights
         self.Win = {} # recurrent weights
         self.Gain = {} # activation function gain
         self.Bias = {} # activation function bias
 
-        self.Nu = Nu # number of inputs
-        self.Nr = Nr # number of units per layer
-        self.Nl = Nl # number of layers
         self.rhos = rhos.tolist() # list of spectral radius
         self.lis = lis # list of leaky rate
         self.iss = iss # list of input scale
@@ -70,32 +71,34 @@ class DeepESN():
         self.IPconf = IPconf   
         
         self.readout = configs["readout"]
+
+        self.reg = configs["reg"]
                
         # sparse recurrent weights init
         if reservoirConf["connectivity"] < 1:
-            for layer in range(Nl):
-                self.W[layer] = np.zeros((Nr,Nr))
-                for row in range(Nr):
-                    number_row_elements = round(reservoirConf["connectivity"] * Nr)
-                    row_elements = random.sample(range(Nr), number_row_elements)
+            for layer in range(self.Nl):
+                self.W[layer] = np.zeros((self.Nr,self.Nr))
+                for row in range(self.Nr):
+                    number_row_elements = round(reservoirConf["connectivity"] * self.Nr)
+                    row_elements = random.sample(range(self.Nr), number_row_elements)
                     self.W[layer][row,row_elements] = np.random.uniform(-1,+1, size = (1,number_row_elements))
                     
         # full-connected recurrent weights init      
         else:
-            for layer in range(Nl):
-                self.W[layer] = np.random.uniform(-1,+1, size = (Nr,Nr))
+            for layer in range(self.Nl):
+                self.W[layer] = np.random.uniform(-1,+1, size = (self.Nr,self.Nr))
         
         # layers init
-        for layer in range(Nl):
+        for layer in range(self.Nl):
 
             target_li = lis[layer]
             target_rho = rhos[layer]
             input_scale = iss[layer]
 
             if layer==0:
-                self.Win[layer] = np.random.uniform(-input_scale, input_scale, size=(Nr,Nu+1))
+                self.Win[layer] = np.random.uniform(-input_scale, input_scale, size=(self.Nr,self.Nu+1))
             else:
-                self.Win[layer] = np.random.uniform(-input_scale, input_scale, size=(Nr,Nr+1))
+                self.Win[layer] = np.random.uniform(-input_scale, input_scale, size=(self.Nr,self.Nr+1))
 
             Ws = (1-target_li) * np.eye(self.W[layer].shape[0], self.W[layer].shape[1]) + target_li * self.W[layer]
             eig_value,eig_vector = np.linalg.eig(Ws)  
@@ -104,8 +107,8 @@ class DeepESN():
             Ws = (Ws *target_rho)/actual_rho
             self.W[layer] = (target_li**-1) * (Ws - (1.-target_li) * np.eye(self.W[layer].shape[0], self.W[layer].shape[1]))
             
-            self.Gain[layer] = np.ones((Nr,1))
-            self.Bias[layer] = np.zeros((Nr,1)) 
+            self.Gain[layer] = np.ones((self.Nr,1))
+            self.Bias[layer] = np.zeros((self.Nr,1)) 
          
         if verbose:
             print('done.')
@@ -235,7 +238,7 @@ class DeepESN():
 
         return state
         
-    def trainReadout(self,trainStates,trainTargets,lb, verbose=0):
+    def trainReadout(self,trainStates,trainTargets,verbose=0):
         # train the readout of DeepESN
 
         trainStates = np.concatenate(trainStates,1)
@@ -252,7 +255,7 @@ class DeepESN():
         
         if self.readout["trainMethod"] == 'SVD': # SVD, accurate method
             U, s, V = np.linalg.svd(trainStates, full_matrices=False);  
-            s = s/(s**2 + lb)
+            s = s/(s**2 + self.reg)
                       
             self.Wout = trainTargets.dot(np.multiply(V.T, np.expand_dims(s,0)).dot(U.T));
             
@@ -260,7 +263,7 @@ class DeepESN():
             B = trainTargets.dot(trainStates.T)
             A = trainStates.dot(trainStates.T)
 
-            self.Wout = np.linalg.solve((A + np.eye(A.shape[0], A.shape[1]) * lb), B.T).T
+            self.Wout = np.linalg.solve((A + np.eye(A.shape[0], A.shape[1]) * self.reg), B.T).T
 
         if verbose:
             print('done.')

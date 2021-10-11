@@ -26,9 +26,14 @@ http://www.di.unipi.it/groups/ciml/
 
 import numpy as np
 
-def config_pianomidi(IP_indexes):
+def config_pianomidi(IP_indexes, Nu):
 
     configs = {}
+
+    configs["Nu"] = Nu
+    configs["Nr"] = 100 # number of recurrent units
+    configs["Nl"] = 5 # number of recurrent layers
+    configs["reg"] = 10.0**-2
     
     configs["rhos"] = 0.1 # set spectral radius 0.1 for all recurrent layers
     configs["lis"] = 0.7 # set li 0.7 for all recurrent layers
@@ -53,10 +58,15 @@ def config_pianomidi(IP_indexes):
     return configs
 
 
-def config_MG(IP_indexes):
+def config_MG(IP_indexes, Nu):
 
     configs = {}
     
+    configs["Nu"] = Nu
+    configs["Nr"] = 100 # number of recurrent units
+    configs["Nl"] = 5 # number of recurrent layers
+    configs["reg"] = 0.0
+
     configs["rhos"] = 0.9 # set spectral radius 0.9 for all recurrent layers
     configs["lis"] = 1.0 # set li 1.0 for all recurrent layers
     configs["iss"] = 0.1 # set insput scale 0.1 for all recurrent layers
